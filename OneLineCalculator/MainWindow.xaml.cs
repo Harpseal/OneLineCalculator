@@ -274,10 +274,40 @@ namespace OneLineCalculator
             mCalcCur = null;
             mCalcList = new List<CalcItem>();
             mComboBoxCalc.ItemsSource = mCalcList;
+
+
+            double res;
+            //res = RegexFormulas.Eval("(99)+(-23-((3+101b)/(0xF0)+-0x123+(0+1+2-3/4*5%6pow7pow8--++----9)))");
+
+            //res = RegexFormulas.Eval("-1+1<<4");
+            //res = RegexFormulas.Eval("-(1+2)");
+            //res = RegexFormulas.Eval("100^165");
+
+            //RegexFormulas.Eval("0+1+2-3/4*5%6pow7pow8--++----9", out res);
+
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            System.Diagnostics.Process proc = System.Diagnostics.Process.GetCurrentProcess();
+            var procList = System.Diagnostics.Process.GetProcesses().Where(p =>
+                             p.ProcessName == proc.ProcessName && p.Id != proc.Id);
+            //proc.Proc
+            if (procList.Count() >= 1)
+            {
+                //foreach (var p in procList)
+                //{
+                //    SetWindowPos(p.MainWindowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                //    //ShowWindow(p.MainWindowHandle, 1);
+                //    //SetFocus(new System.Runtime.InteropServices.HandleRef(null, p.MainWindowHandle));
+                //    //SetForegroundWindow(p.MainWindowHandle);
+                //}
+                MessageBox.Show(Application.Current.MainWindow.GetType().Assembly.GetName().Name+"\nAlready an instance is running...", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning, MessageBoxResult.OK, MessageBoxOptions.ServiceNotification);
+                App.Current.Shutdown();
+                //this.Close();
+                return;
+            }
+
             TextBlock text = mTextResult;
             if (text != null)
             {
@@ -841,6 +871,8 @@ namespace OneLineCalculator
 
             return true;
         }
+
+        private int mDebugMode = 0;
         private void ComboBoxCalc_KeyUp(object sender, KeyEventArgs e)
         {
             ComboBox cb = sender as ComboBox;
@@ -883,22 +915,70 @@ namespace OneLineCalculator
             }
             else
             {
-                try
+                //MenuItemDebug.Header = "[Debug] " + (mDebugMode == 0?"Both":mDebugMode == 1? "3rd":"Native");
+                double resultNative = double.NaN;
+                double result3rd = double.NaN;
+
+                if (mDebugMode == 0 || mDebugMode >= 2)
                 {
-                    var result = mInterpreter.Eval(cb.Text);
+                    try
+                    {
+                        resultNative = RegexFormulas.Eval(cb.Text);
+                    }
+                    catch (Exception ex)
+                    {
+                        //Console.WriteLine(ex.Message);
+                        resultNative = double.NaN;
+                    }
+                }
+
+                if (mDebugMode == 0 || mDebugMode == 1)
+                {
+                    try
+                    {
+                        var result = mInterpreter.Eval(cb.Text);
+
+                        if (result.GetType() == typeof(int))
+                            result3rd = (int)result;
+                        else if (result.GetType() == typeof(float))
+                            result3rd = (double)((float)result);
+                        else if (result.GetType() == typeof(double))
+                            result3rd = (double)result;
+
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                        result3rd = double.NaN;
+                    }
+                }
+
+                if (double.IsNaN(resultNative) && double.IsNaN(result3rd))
+                {
+                    mTextResult.Text = "----"; ;
+                    mTextResult.Opacity = 0.5;
+                    if (mCalcCur != null)
+                    {
+                        mCalcCur.mCalcResult = Double.NaN;
+                        mCalcCur.mCalcTextResult = "";
+                    }
+                }
+                else
+                {
 
                     if (mCalcCur == null)
                         mCalcCur = new CalcItem();
-
-                    if (result.GetType() == typeof(int))
-                        mCalcCur.mCalcResult = (int)result;
-                    else if (result.GetType() == typeof(float))
-                        mCalcCur.mCalcResult = (double)((float)result);
-                    else if (result.GetType() == typeof(double))
-                        mCalcCur.mCalcResult = (double)result;
                     mCalcCur.mCalcText = cb.Text;
-                    mCalcCur.mCalcTextResult = result.ToString();
 
+                    if (!double.IsNaN(resultNative))
+                        mCalcCur.mCalcResult = resultNative;
+                    else if (!double.IsNaN(result3rd))
+                        mCalcCur.mCalcResult = result3rd;
+
+                    mCalcCur.mCalcTextResult = mCalcCur.mCalcResult.ToString();
+
+                    if (mDebugMode == 0)
+                        Console.WriteLine("Native:" + resultNative + " 3rd:" + result3rd);
 
                     if (e.Key == Key.Enter)
                     {
@@ -913,18 +993,16 @@ namespace OneLineCalculator
                     else
                     {
                         UpdateResult();
+                        if (mDebugMode == 0)
+                        {
+
+                            if ((!double.IsNaN(resultNative) && !double.IsNaN(result3rd) && Math.Abs(resultNative - result3rd) > 2) ||
+                                (double.IsNaN(resultNative) && !double.IsNaN(result3rd)))
+                                mTextResult.Text = "N:" + resultNative + " 3:" + result3rd;
+                        }
+                        
+                            
                         mTextResult.Opacity = 1;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    //Console.WriteLine(ex.Message);
-                    mTextResult.Text = "----"; ;
-                    mTextResult.Opacity = 0.5;
-                    if (mCalcCur != null)
-                    {
-                        mCalcCur.mCalcResult = Double.NaN;
-                        mCalcCur.mCalcTextResult = "";
                     }
                 }
             }
@@ -984,6 +1062,17 @@ namespace OneLineCalculator
             else if (sender == MenuItemCopyAll)
             {
                 Clipboard.SetText(mComboBoxCalc.Text + " = " + mTextResult.Text);
+            }
+            else if (sender == MenuItemClose)
+            {
+                this.Close();
+            }
+            else if (sender == MenuItemDebug)
+            {
+                mDebugMode++;
+                if (mDebugMode > 2)
+                    mDebugMode = 0;
+                MenuItemDebug.Header = "[Debug] " + (mDebugMode == 0?"Both":mDebugMode == 1? "3rd":"Native");
             }
         }
 

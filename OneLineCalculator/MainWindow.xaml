@@ -38,6 +38,12 @@
                     <MenuItem x:Name="MenuItemShowHex" Header="Show int as Hex"  Click="MenuItem_Click" IsCheckable="True"/>
                     <MenuItem x:Name="MenuItemShowBinary" Header="Show int as Binary"  Click="MenuItem_Click" IsCheckable="True"/>
                     <MenuItem x:Name="MenuItemCopyAll" Header="Copy all to clipboard"  Click="MenuItem_Click"/>
+                    <Separator></Separator>
+                    <MenuItem x:Name="MenuItemDebug" Header="[Debug] - Both"  Click="MenuItem_Click"/>
+                    <Separator></Separator>
+                    <MenuItem x:Name="MenuItemClose" Header="Close"  Click="MenuItem_Click"/>
+                    
+                    
                 </ContextMenu>
             </Button.ContextMenu>
         </Button>
