@@ -157,8 +157,8 @@ namespace OneLineCalculator
         private int mHitState = 0;
         private void OnGlobalKeyPressed(object sender, GlobalKeyboardHookEventArgs e)
         {
-            //Console.WriteLine(e.KeyboardData.VirtualCode  + "(" + KeyInterop.KeyFromVirtualKey(e.KeyboardData.VirtualCode).ToString() + 
-            //    ")  state:" + e.KeyboardState + "  flag:" + e.KeyboardData.Flags.ToString("X4"));
+            Console.WriteLine(e.KeyboardData.VirtualCode  + "(" + KeyInterop.KeyFromVirtualKey(e.KeyboardData.VirtualCode).ToString() + 
+                ")  state:" + e.KeyboardState + "  flag:" + e.KeyboardData.Flags.ToString("X4"));
 
             Key key = KeyInterop.KeyFromVirtualKey(e.KeyboardData.VirtualCode);
 
@@ -216,7 +216,7 @@ namespace OneLineCalculator
                 mIsKeyShiftDown = isKeyDown;
 
 
-            //Console.WriteLine("Hit " + mHitState + "(" + mIsKeyAltDown + ") keyup " + isKeyUp + "  "  + key0 + "+" + key1 + "  Cur " + key + "  alt:" + mIsKeyAltDown + " ctrl:" + mIsKeyCtrlDown + " shf:" + mIsKeyShiftDown + " win:" + mIsKeyWinDown);
+            Console.WriteLine("Hit " + mHitState + "(" + mIsKeyAltDown + ") keyup " + isKeyUp + "  "  + key0 + "+" + key1 + "  Cur " + key + "  alt:" + mIsKeyAltDown + " ctrl:" + mIsKeyCtrlDown + " shf:" + mIsKeyShiftDown + " win:" + mIsKeyWinDown);
 
             if (mHitState == 2)
             {
@@ -282,6 +282,7 @@ namespace OneLineCalculator
             //res = RegexFormulas.Eval("-1+1<<4");
             //res = RegexFormulas.Eval("-(1+2)");
             //res = RegexFormulas.Eval("100^165");
+            //res = RegexFormulas.Eval("int(1111pow11111)");
 
             //RegexFormulas.Eval("0+1+2-3/4*5%6pow7pow8--++----9", out res);
 
@@ -462,8 +463,28 @@ namespace OneLineCalculator
             else if (this.Top + this.Height > rect.Y + rect.Height)
                 this.Top = rect.Y + rect.Height - this.Height;
 
-#if false
-            //https://stackoverflow.com/questions/257587/bring-a-window-to-the-front-in-wpf
+#if true
+            if (MenuItemShowMode.IsChecked == true)
+            {
+                //https://stackoverflow.com/questions/257587/bring-a-window-to-the-front-in-wpf
+                if (!this.IsVisible)
+                {
+                    this.Show();
+                }
+
+                if (this.WindowState == WindowState.Minimized)
+                {
+                    this.WindowState = WindowState.Normal;
+                }
+
+                this.Activate();
+                this.Topmost = true;  // important
+                this.Topmost = false; // important
+            }
+            else
+            {
+                this.Activate();
+            }
 #else
             this.Activate();
 #endif
@@ -891,6 +912,14 @@ namespace OneLineCalculator
                 mTextResult.Text = "----";
                 mTextResult.Opacity = 0.5;
             }
+            else if (e.Key == Key.Up && mComboBoxCalc.IsDropDownOpen)
+            {
+                mComboBoxCalc.IsDropDownOpen = false;
+            }
+            else if (e.Key == Key.Down && !mComboBoxCalc.IsDropDownOpen)
+            {
+                mComboBoxCalc.IsDropDownOpen = true;
+            }
             else if (cmdType != CMD_TYPE.None)
             {
                 if (e.Key == Key.Enter && (cmdType & CMD_TYPE.Done) != 0)
@@ -919,16 +948,44 @@ namespace OneLineCalculator
                 double resultNative = double.NaN;
                 double result3rd = double.NaN;
 
+                mTextEqualitySign.Text = "=";
+                bool isErrorDetected = false;
                 if (mDebugMode == 0 || mDebugMode >= 2)
                 {
                     try
                     {
-                        resultNative = RegexFormulas.Eval(cb.Text);
+                        RegexFormulas.EvalWarningFlags flags = RegexFormulas.EvalWarningFlags.None;
+                        resultNative = RegexFormulas.Eval(cb.Text, ref flags);
+                        if ((flags & RegexFormulas.EvalWarningFlags.DoubleToInt) != 0)
+                        {
+                            Console.WriteLine(RegexFormulas.EvalWarningFlags.DoubleToInt);
+                            mTextEqualitySign.Text = "≈";
+                        }
+
+                    }
+                    catch (ArgumentOutOfRangeException ea)
+                    {
+                        isErrorDetected = true;
+                        mTextResult.Text = "OutOfRange:"+ea.Message;
+                        resultNative = double.NaN;
+                    }
+                    catch (OverflowException eof)
+                    {
+                        isErrorDetected = true;
+                        mTextResult.Text = "Overflow:" + eof.Message;
+                        resultNative = double.NaN;
+                    }
+                    catch (DivideByZeroException ediv)
+                    {
+                        isErrorDetected = true;
+                        mTextResult.Text = "DivideByZero";
+                        resultNative = double.NaN;
                     }
                     catch (Exception ex)
                     {
                         //Console.WriteLine(ex.Message);
                         resultNative = double.NaN;
+
                     }
                 }
 
@@ -955,7 +1012,8 @@ namespace OneLineCalculator
 
                 if (double.IsNaN(resultNative) && double.IsNaN(result3rd))
                 {
-                    mTextResult.Text = "----"; ;
+                    if (!isErrorDetected)
+                        mTextResult.Text = "----"; ;
                     mTextResult.Opacity = 0.5;
                     if (mCalcCur != null)
                     {
@@ -1009,6 +1067,7 @@ namespace OneLineCalculator
 
             size = MeasureString(mTextResult.Text);
             mTextResult.Width = size.Width;
+            e.Handled = true;
         }
 
         private void ComboBoxCalc_DropDownOpened(object sender, EventArgs e)

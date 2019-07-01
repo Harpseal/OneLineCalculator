@@ -18,29 +18,6 @@ namespace OneLineCalculator
                 Console.WriteLine(String.Format("{0} [{1}]  idx:{2} len:{3}", m, matches[m].Value, matches[m].Index, matches[m].Length));
             }
         }
-
-        public class EvalItem
-        {
-            private double mVal = Double.NaN;
-            private string mStr;
-            public EvalItem(string text)
-            {
-
-            }
-
-            public bool isNumber()
-            {
-                return !Double.IsNaN(mVal);
-            }
-
-        }
-
-        //public class EvalTreeItem
-        //{
-        //    public EvalTreeItem(List<string> child) { }
-
-        //    public List<string>
-        //}
         
 
         public static string ReplaceWithIndex(string text, MatchCollection matches,
@@ -88,7 +65,11 @@ namespace OneLineCalculator
         {
             try
             {
-                if (text.StartsWith("0x"))
+                if (text.ToLower().Equals("pi"))
+                    return Math.PI;
+                else if (text.ToLower().Equals("conste"))
+                    return Math.E;
+                else if (text.StartsWith("0x"))
                     return Convert.ToInt64(text.Substring(2), 16);
                 else if (text.StartsWith("0b"))
                     return Convert.ToInt64(text.Substring(2), 2);
@@ -131,7 +112,7 @@ namespace OneLineCalculator
             return op;
         }
 
-        public static double GetValue(string textLevel, string patternItem, List<double> listValue, List<string> listLevel)
+        public static double GetValue(string textLevel, string patternItem, List<double> listValue, List<string> listLevel, ref EvalWarningFlags warningFlags)
         {
             MatchCollection matches;
             matches = Regex.Matches(textLevel, patternItem);
@@ -146,7 +127,7 @@ namespace OneLineCalculator
                     if (int.TryParse(textLevel.Substring(1, textLevel.Length-2),out valIdx))
                     {
                         if (textLevel.StartsWith("{"))
-                            return GetValue(listLevel[valIdx], patternItem, listValue, listLevel);
+                            return GetValue(listLevel[valIdx], patternItem, listValue, listLevel, ref warningFlags);
                         else
                             return listValue[valIdx];
                     }
@@ -155,29 +136,98 @@ namespace OneLineCalculator
                         throw new Exception("ERROR Next idx@ : " + textLevel);
                     }
                 }
-                value0 = GetValue(matches[0].Value, patternItem, listValue, listLevel);
+                value0 = GetValue(matches[0].Value, patternItem, listValue, listLevel, ref warningFlags);
 
                 if (matches[0].Index != 0)
                 {
                     string op0 = textLevel.Substring(0, matches[0].Index);
                     op0 = FixAddAndSub(op0);
-                    if (op0.Equals("-"))
-                        baseValue = -1;
-                    else if (!op0.Equals("+"))
-                        throw new Exception("ERROR unknown op0@ : " + textLevel + " op:" + op0);
+                    while (op0.Length != 0 && (op0[0] == '-' || op0[0] == '+'))
+                    {
+                        if (op0[0] == '-')
+                            baseValue *= -1;
+                        op0 = op0.Substring(1, op0.Length - 1);
+                    }
 
                     value0 *= baseValue;
+
+                    if (op0.Length != 0)
+                    {
+                        double value0Tmp;
+                        switch (op0)
+                        {
+                            case "log":
+                                value0Tmp = Math.Log(value0);
+                                break;
+                            case "exp":
+                                value0Tmp = Math.Exp(value0);
+                                break;
+                            case "sqrt":
+                                value0Tmp = Math.Sqrt(value0);
+                                break;
+
+                            case "cos":
+                                value0Tmp = Math.Cos(value0);
+                                break;
+                            case "cosh":
+                                value0Tmp = Math.Cosh(value0);
+                                break;
+                            case "acos":
+                                value0Tmp = Math.Acos(value0);
+                                break;
+
+                            case "sin":
+                                value0Tmp = Math.Sin(value0);
+                                break;
+                            case "sinh":
+                                value0Tmp = Math.Sinh(value0);
+                                break;
+                            case "asin":
+                                value0Tmp = Math.Asin(value0);
+                                break;
+
+                            case "tan":
+                                value0Tmp = Math.Tan(value0);
+                                break;
+                            case "tanh":
+                                value0Tmp = Math.Tanh(value0);
+                                break;
+                            case "atan":
+                                value0Tmp = Math.Atan(value0);
+                                break;
+
+                            case "int":
+                                if (!(value0 >= -9223372036854775808.0   // -2^63
+                                     && value0 < 9223372036854775808.0)) // 2^63
+                                    throw new OverflowException($"{value0} to int64");
+                                value0Tmp = (long)value0;
+                                break;
+                            default:
+                                throw new Exception("ERROR unknown op0@ : " + textLevel + " op:" + op0);
+                        }
+                        if (double.IsNaN(value0Tmp))
+                            throw new ArgumentOutOfRangeException("",$"{op0}({value0})");
+                        value0 = value0Tmp;
+                    }
                 }
                 if (matches.Count == 1)
+                {
+                    if (matches[0].Index + matches[0].Length != textLevel.Length)
+                        throw new Exception("ERROR unknown status@ : " + textLevel + " matchcount:" + matches.Count);
                     return value0;
+                }
             }
 
             if (matches.Count == 2)
             {
+
+                if (matches[matches.Count - 1].Index + matches[matches.Count - 1].Length != textLevel.Length)
+                    throw new Exception("ERROR unknown status@ : " + textLevel + " matchcount:" + matches.Count);
+
                 int opStart1 = 0, opEnd1 = 0;
                 opStart1 = matches[matches.Count - 2].Index + matches[matches.Count - 2].Length;
                 opEnd1 = matches[matches.Count - 1].Index;
-                value1 = GetValue(matches[1].Value, patternItem, listValue, listLevel);
+                value1 = GetValue(matches[1].Value, patternItem, listValue, listLevel, ref warningFlags);
 
                 string op1 = "";
                 if (opEnd1 == opStart1)
@@ -214,11 +264,15 @@ namespace OneLineCalculator
                             return (long)value0 & (long)value1;
                         case "<<":
                             if (value1 > Int32.MaxValue)
-                                throw new OverflowException("Overflow at converting double(" + value1 + ") to int32(max:" + Int32.MaxValue + ")");
+                                throw new OverflowException($"{value1} to int");
+                            else if ((double)((int)value0) != value0 || (double)((int)value1) != value1)
+                                warningFlags |= EvalWarningFlags.DoubleToInt;
                             return value1 >= 0 ? (long)value0 << (int)value1 : (long)value0 >> (int)(-value1);
                         case ">>":
                             if (value1 > Int32.MaxValue)
-                                throw new OverflowException("Overflow at converting double(" + value1 + ") to int32(max:" + Int32.MaxValue + ")");
+                                throw new OverflowException($"{value1} to int");
+                            else if ((double)((int)value0) != value0 || (double)((int)value1) != value1)
+                                warningFlags |= EvalWarningFlags.DoubleToInt;
                             return value1 >= 0 ? (long)value0 >> (int)value1 : (long)value0 << (int)(-value1);
 
 
@@ -237,8 +291,18 @@ namespace OneLineCalculator
             throw new Exception("ERROR unknown status@ : " + textLevel + " matchcount:" + matches.Count);
         }
 
+        public enum EvalWarningFlags
+        {
+            None = 0x0000,
+            DoubleToInt = 0x0001
+        }
 
         public static double Eval(string text)
+        {
+            EvalWarningFlags warningFlags = EvalWarningFlags.None;
+            return Eval(text, ref warningFlags);
+        }
+        public static double Eval(string text,ref EvalWarningFlags warningFlags)
         {
             text = text.Trim().Replace(" ", "");
 
@@ -271,16 +335,15 @@ namespace OneLineCalculator
             } while (isWrongFmtDetect);
 
 
-
-            //Console.WriteLine("fix +-: " + text);
-            //return 0;
-
             MatchCollection matches;
             int rootIdx = 0;
             List<double> listValue = new List<double>();
             List<string> listLevel = new List<string>();
 
-            matches = Regex.Matches(text, "(0x|0b|-|\\+)?[\\da-fA-F\\.]+b?");//\(([^\(\)]*)\)
+
+            //Step1. replace numbers
+            //matches = Regex.Matches(text, "((0x|0b|-|\\+)?[\\da-fA-F\\.]+b?|pi|conste)");//\(([^\(\)]*)\)
+            matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|[\\d.]+");//\(([^\(\)]*)\)
 
             string textNoNum = ReplaceWithIndex(text, matches, true, listValue.Count, "[", "]");
             foreach (Match m in matches)
@@ -298,6 +361,7 @@ namespace OneLineCalculator
             //Console.WriteLine(textNoNum);
             //return 0;
 
+            //Step2. Detect parentheses pairs
             string textLevel = textNoNum;
             Console.WriteLine(textLevel);
             int level = 0;
@@ -323,9 +387,9 @@ namespace OneLineCalculator
             for (int i = 0; i < listLevel.Count; i++)
                 Console.WriteLine(i + ": " + listLevel[i]);
 
-
+            //Step3. Detect the supported operators
             string patternItem = "[\\[\\{]\\d+[\\]\\}]";//\\[\\d+\\]
-            string [] patternBaseList = new string[] { "(\\*|\\/|pow|%|>>|<<|\\^|\\||\\&)+"+ patternItem, "[\\+\\-]+"+ patternItem };
+            string [] patternBaseList = new string[] { "(\\*|\\/|pow|int|%|>>|<<|\\^|\\||\\&|log|exp|cosh|tanh|sinh|acos|atan|asin|cos|tan|sin|sqrt)+" + patternItem, "[\\+\\-]+"+ patternItem };
             //foreach (string patternBase in patternBaseList)
             for (int p=0;p< patternBaseList.Length;p++)
             {
@@ -372,16 +436,7 @@ namespace OneLineCalculator
 
 
             double result = double.NaN;
-            //try {
-                result = GetValue(listLevel[rootIdx], patternItem, listValue, listLevel);
-            //}
-            //catch (Exception ex)
-            //{
-            //    Console.WriteLine(ex.Message);
-            //}
-
-
-            
+            result = GetValue(listLevel[rootIdx], patternItem, listValue, listLevel,ref warningFlags);
 
 
             Console.WriteLine("Value:");

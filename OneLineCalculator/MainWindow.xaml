@@ -27,7 +27,7 @@
                 </Style>
             </ComboBox.ItemContainerStyle>
         </ComboBox>
-        <TextBlock Grid.Column="1" Text="=" VerticalAlignment="Center" HorizontalAlignment="Center"></TextBlock>
+        <TextBlock Grid.Column="1" x:Name="mTextEqualitySign" Text="=" FontFamily="Consolas" FontSize="18" VerticalAlignment="Center" HorizontalAlignment="Center"></TextBlock>
         <Button Grid.Column="2" x:Name="btnResult" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}" Focusable="False" Background="Transparent" BorderBrush="Transparent" 
                 PreviewMouseLeftButtonDown="OnButtonMove_MouseDown" PreviewMouseMove="OnButtonMove_MouseMove" Click="BtnResult_Click">
             <TextBlock  x:Name="mTextResult" Text="----" FontFamily="Consolas" FontSize="20" Width="50" MinWidth="50" VerticalAlignment="Center" Opacity="0.5"></TextBlock>
@@ -40,6 +40,7 @@
                     <MenuItem x:Name="MenuItemCopyAll" Header="Copy all to clipboard"  Click="MenuItem_Click"/>
                     <Separator></Separator>
                     <MenuItem x:Name="MenuItemDebug" Header="[Debug] - Both"  Click="MenuItem_Click"/>
+                    <MenuItem x:Name="MenuItemShowMode" Header="[Debug] - Show(advance)"  Click="MenuItem_Click" IsCheckable="True" IsChecked="True"/>
                     <Separator></Separator>
                     <MenuItem x:Name="MenuItemClose" Header="Close"  Click="MenuItem_Click"/>
                     
