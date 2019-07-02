@@ -401,23 +401,31 @@ namespace OneLineCalculator
 
             //Step3. Detect the supported operators
             string patternItem = "[\\[\\{]\\d+[\\]\\}]";//\\[\\d+\\]
+            string patternOneSideOp = "log|exp" + "|[a]?cos[h]?|[a]?tan[h]?|[a]?sin[h]?" + "|sqrt|int";
             for (int l = 0; l < listLevel.Count; l++)
             {
 
-                matches = Regex.Matches(listLevel[l], patternItem);
-                if (matches.Count < 2)
+                //matches = Regex.Matches(listLevel[l], patternItem);
+                //if (matches.Count < 2)
+                //    continue;
+                matches = Regex.Matches(listLevel[l], patternOneSideOp);
+                if (matches.Count <= 1)
                     continue;
 
-                matches = Regex.Matches(listLevel[l], "(log|exp" + "|[a]?cos[h]?|[a]?tan[h]?|[a]?sin[h]?" + "|sqrt)"+patternItem);
+                matches = Regex.Matches(listLevel[l], "("+patternOneSideOp+")" + patternItem);
+                if (matches.Count == 0)
+                    break;
+                
                 string textTmp = ReplaceWithIndex(listLevel[l], matches, true, listLevel.Count, "{", "}");
                 listLevel[l] = textTmp;
                 foreach (Match m in matches)
                 {
                     listLevel.Add(m.Value);
                 }
+                l--;
             }
             
-            string [] patternBaseList = new string[] { "(\\*|\\/|pow|int|%|>>|<<|\\^|\\||\\&)+" + patternItem, "[\\+\\-]+"+ patternItem };
+            string [] patternBaseList = new string[] { "(\\*|\\/|pow|%|>>|<<|\\^|\\||\\&)+" + patternItem, "[\\+\\-]+"+ patternItem };
             for (int p=0;p< patternBaseList.Length;p++)
             {
                 string patternBase = patternBaseList[p];
