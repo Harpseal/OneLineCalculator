@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace OneLineCalculator
 {
@@ -18,9 +19,17 @@ namespace OneLineCalculator
                 Console.WriteLine(String.Format("{0} [{1}]  idx:{2} len:{3}", m, matches[m].Value, matches[m].Index, matches[m].Length));
             }
         }
-        
 
         public static string ReplaceWithIndex(string text, MatchCollection matches,
+            bool replaceByMatchIndex, int matchIndexOffset,
+            string startNew = "", string endNew = "",
+            string startOld = "", string endOld = "")
+        {
+            return ReplaceWithIndex(text, matches.Cast<Match>().ToList(), replaceByMatchIndex, matchIndexOffset,
+                startNew, endNew, startOld, endOld);
+        }
+
+        public static string ReplaceWithIndex(string text, List<Match> matches,
             bool replaceByMatchIndex, int matchIndexOffset,
             string startNew = "", string endNew = "",
             string startOld="", string endOld="")
@@ -67,7 +76,7 @@ namespace OneLineCalculator
             {
                 if (text.ToLower().Equals("pi"))
                     return Math.PI;
-                else if (text.ToLower().Equals("conste"))
+                else if (text.ToLower().Equals("conste") || text.ToLower().Equals("e"))
                     return Math.E;
                 else if (text.StartsWith("0x"))
                     return Convert.ToInt64(text.Substring(2), 16);
@@ -342,13 +351,19 @@ namespace OneLineCalculator
 
 
             //Step1. replace numbers
-            //matches = Regex.Matches(text, "((0x|0b|-|\\+)?[\\da-fA-F\\.]+b?|pi|conste)");//\(([^\(\)]*)\)
-            matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|[\\d.]+");//\(([^\(\)]*)\)
+            //matches = Regex.Matches(text, "exp|e");
+            //var matchList = matches.Cast<Match>().Where(x => x.Value.ToLower().Equals("e")).ToList<Match>();
 
-            string textNoNum = ReplaceWithIndex(text, matches, true, listValue.Count, "[", "]");
-            foreach (Match m in matches)
+            ////matches = Regex.Matches(text, "((0x|0b|-|\\+)?[\\da-fA-F\\.]+b?|pi|conste)");//\(([^\(\)]*)\)
+            //matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|(-|\\+)?[\\d.]+");//\(([^\(\)]*)\)
+            //matchList.AddRange(matches.Cast<Match>().ToList());
+
+            matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|(-|\\+)?[\\d.]+|exp|e");//\(([^\(\)]*)\)
+            var matchList = matches.Cast<Match>().Where(x => !x.Value.ToLower().Equals("exp")).ToList<Match>();
+
+            string textNoNum = ReplaceWithIndex(text, matchList, true, listValue.Count, "[", "]");
+            foreach (Match m in matchList)
             {
-                Console.WriteLine(m.Value);
                 double val = StrToValue(m.Value);
                 if (Double.IsNaN(val))
                 {
@@ -356,10 +371,6 @@ namespace OneLineCalculator
                 }
                 listValue.Add(val);
             }
-            //PrintMatches(matches);
-            //Console.WriteLine(text);
-            //Console.WriteLine(textNoNum);
-            //return 0;
 
             //Step2. Detect parentheses pairs
             string textLevel = textNoNum;
@@ -387,18 +398,31 @@ namespace OneLineCalculator
             for (int i = 0; i < listLevel.Count; i++)
                 Console.WriteLine(i + ": " + listLevel[i]);
 
+
             //Step3. Detect the supported operators
             string patternItem = "[\\[\\{]\\d+[\\]\\}]";//\\[\\d+\\]
-            string [] patternBaseList = new string[] { "(\\*|\\/|pow|int|%|>>|<<|\\^|\\||\\&|log|exp|cosh|tanh|sinh|acos|atan|asin|cos|tan|sin|sqrt)+" + patternItem, "[\\+\\-]+"+ patternItem };
-            //foreach (string patternBase in patternBaseList)
+            for (int l = 0; l < listLevel.Count; l++)
+            {
+
+                matches = Regex.Matches(listLevel[l], patternItem);
+                if (matches.Count < 2)
+                    continue;
+
+                matches = Regex.Matches(listLevel[l], "(log|exp" + "|[a]?cos[h]?|[a]?tan[h]?|[a]?sin[h]?" + "|sqrt)"+patternItem);
+                string textTmp = ReplaceWithIndex(listLevel[l], matches, true, listLevel.Count, "{", "}");
+                listLevel[l] = textTmp;
+                foreach (Match m in matches)
+                {
+                    listLevel.Add(m.Value);
+                }
+            }
+            
+            string [] patternBaseList = new string[] { "(\\*|\\/|pow|int|%|>>|<<|\\^|\\||\\&)+" + patternItem, "[\\+\\-]+"+ patternItem };
             for (int p=0;p< patternBaseList.Length;p++)
             {
                 string patternBase = patternBaseList[p];
                 for (int l = 0; l < listLevel.Count; l++)
                 {
-                    //\\[\\d+\\]((\\+|\\-|\\*|\\/|mod|%)+\\[\\d+\\])+
-                    //\\[\\d+\\]((\\*|\\/|mod|%)+\\[\\d+\\])+
-
                     matches = Regex.Matches(listLevel[l], patternItem);
                     if (matches.Count <= 2)
                         continue;
@@ -427,11 +451,6 @@ namespace OneLineCalculator
                         }
                     }
                 }
-
-                Console.WriteLine("Levelv0-" + p + " (root:" + rootIdx + "):");
-                for (int i = 0; i < listLevel.Count; i++)
-                    Console.WriteLine(i + ": " + listLevel[i]);
-
             }
 
 
