@@ -12,8 +12,8 @@
   * ```+ - * / %```
 * Bitwise logical operator
   * ```| & ^ << >>```
-    * \^:xor
-    * << >> : float value is support but not
+    * \^ : xor
+    * << >> : float value is supported but converted to int before the bitwise shift
 * Trigonometric functions
   * ```cosh tanh sinh acos atan asin cos tan sin```
 * Others

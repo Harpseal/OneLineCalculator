@@ -480,6 +480,7 @@ namespace OneLineCalculator
                 this.Activate();
                 this.Topmost = true;  // important
                 this.Topmost = false; // important
+                this.Focus();         // important
             }
             else
             {
@@ -908,9 +909,16 @@ namespace OneLineCalculator
             CMD_TYPE cmdType = CheckCmd(cb.Text,false, out cmdResultMsg);
             if (e.Key == Key.Escape)
             {
-                cb.Text = "";
-                mTextResult.Text = "----";
-                mTextResult.Opacity = 0.5;
+                if (cb.Text.Length == 0)
+                {
+                    this.Hide();
+                }
+                else
+                {
+                    cb.Text = "";
+                    mTextResult.Text = "----";
+                    mTextResult.Opacity = 0.5;
+                }
             }
             else if (e.Key == Key.Up && mComboBoxCalc.IsDropDownOpen)
             {
