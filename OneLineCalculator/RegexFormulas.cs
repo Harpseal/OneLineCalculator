@@ -121,13 +121,31 @@ namespace OneLineCalculator
             return op;
         }
 
-        public static double GetValue(string textLevel, string patternItem, List<double> listValue, List<string> listLevel, ref EvalWarningFlags warningFlags)
+        private string FixOP(string text)
+        {
+            bool isWrongFmtDetect;
+            string[,] fmtReplacePair = { { "--", "+" }, { "-+", "-" }, { "+-", "-" }, { "--", "+" }, { "++", "+" }, { "+-", "-" } };
+            do
+            {
+                isWrongFmtDetect = false;
+                for (int i = 0; i < fmtReplacePair.GetLength(0); i++)
+                {
+                    if (text.Contains(fmtReplacePair[i, 0]))
+                    {
+                        isWrongFmtDetect = true;
+                        text = text.Replace(fmtReplacePair[i, 0], fmtReplacePair[i, 1]);
+                    }
+                }
+            } while (isWrongFmtDetect);
+            return text;
+        }
+        public static List<double> GetValue(string textLevel, string patternItem, List<double> listValue, List<string> listLevel, ref EvalWarningFlags warningFlags)
         {
             MatchCollection matches;
             matches = Regex.Matches(textLevel, patternItem);
            
             double baseValue = 1;
-            double value0 = double.NaN, value1 = double.NaN;
+            List<double> valueList0 = null, valueList1 = null;
             if (matches.Count >= 1)
             {
                 if (matches[0].Value.Equals(textLevel))
@@ -138,14 +156,14 @@ namespace OneLineCalculator
                         if (textLevel.StartsWith("{"))
                             return GetValue(listLevel[valIdx], patternItem, listValue, listLevel, ref warningFlags);
                         else
-                            return listValue[valIdx];
+                            return new List<double> { listValue[valIdx] };
                     }
                     else
                     {
                         throw new Exception("ERROR Next idx@ : " + textLevel);
                     }
                 }
-                value0 = GetValue(matches[0].Value, patternItem, listValue, listLevel, ref warningFlags);
+                valueList0 = GetValue(matches[0].Value, patternItem, listValue, listLevel, ref warningFlags);
 
                 if (matches[0].Index != 0)
                 {
@@ -158,13 +176,17 @@ namespace OneLineCalculator
                         op0 = op0.Substring(1, op0.Length - 1);
                     }
 
-                    value0 *= baseValue;
+                    valueList0[0] *= baseValue;
 
                     if (op0.Length != 0)
                     {
                         double value0Tmp;
+                        double value0 = valueList0[0];
                         switch (op0)
                         {
+                            case "-":
+                                value0Tmp = value0*-1;
+                                break;
                             case "log":
                                 value0Tmp = Math.Log(value0);
                                 break;
@@ -216,14 +238,14 @@ namespace OneLineCalculator
                         }
                         if (double.IsNaN(value0Tmp))
                             throw new ArgumentOutOfRangeException("",$"{op0}({value0})");
-                        value0 = value0Tmp;
+                        valueList0 = new List<double> { value0Tmp };
                     }
                 }
                 if (matches.Count == 1)
                 {
                     if (matches[0].Index + matches[0].Length != textLevel.Length)
                         throw new Exception("ERROR unknown status@ : " + textLevel + " matchcount:" + matches.Count);
-                    return value0;
+                    return valueList0;
                 }
             }
 
@@ -236,7 +258,7 @@ namespace OneLineCalculator
                 int opStart1 = 0, opEnd1 = 0;
                 opStart1 = matches[matches.Count - 2].Index + matches[matches.Count - 2].Length;
                 opEnd1 = matches[matches.Count - 1].Index;
-                value1 = GetValue(matches[1].Value, patternItem, listValue, listLevel, ref warningFlags);
+                valueList1 = GetValue(matches[1].Value, patternItem, listValue, listLevel, ref warningFlags);
 
                 string op1 = "";
                 if (opEnd1 == opStart1)
@@ -247,42 +269,58 @@ namespace OneLineCalculator
                     op1 = FixAddAndSub(op1);
                 }
 
+                double value0, value1, valueResult;
+                value0 = valueList0[0];
+                value1 = valueList1[0];
+                valueResult = double.NaN;
+
                 if (op1.Length !=0)
                 { 
                     switch (op1)
                     {
                         case "+":
-                            return value0 + value1;
+                            valueResult = value0 + value1;
+                            break;
                         case "-":
-                            return value0 - value1;
+                            valueResult = value0 - value1;
+                            break;
                         case "*":
-                            return value0 * value1;
+                            valueResult = value0 * value1;
+                            break;
                         case "/":
                             if (value1 == 0)
                                 throw new DivideByZeroException("ERROR div by zero@ : " + textLevel + " value1:" + matches[1].Value);
-                            return value0 / value1;
+                            valueResult = value0 / value1;
+                            break;
                         case "pow":
-                            return Math.Pow(value0, value1);
+                            valueResult = Math.Pow(value0, value1);
+                            break;
                         case "%":
-                            return (long)value0 % (long)value1;
+                            valueResult = (long)value0 % (long)value1;
+                            break;
                         case "^":
-                            return (long)value0 ^ (long)value1;
+                            valueResult = (long)value0 ^ (long)value1;
+                            break;
                         case "|":
-                            return (long)value0 | (long)value1;
+                            valueResult = (long)value0 | (long)value1;
+                            break;
                         case "&":
-                            return (long)value0 & (long)value1;
+                            valueResult = (long)value0 & (long)value1;
+                            break;
                         case "<<":
                             if (value1 > Int32.MaxValue)
                                 throw new OverflowException($"{value1} to int");
                             else if ((double)((int)value0) != value0 || (double)((int)value1) != value1)
                                 warningFlags |= EvalWarningFlags.DoubleToInt;
-                            return value1 >= 0 ? (long)value0 << (int)value1 : (long)value0 >> (int)(-value1);
+                            valueResult = value1 >= 0 ? (long)value0 << (int)value1 : (long)value0 >> (int)(-value1);
+                            break;
                         case ">>":
                             if (value1 > Int32.MaxValue)
                                 throw new OverflowException($"{value1} to int");
                             else if ((double)((int)value0) != value0 || (double)((int)value1) != value1)
                                 warningFlags |= EvalWarningFlags.DoubleToInt;
-                            return value1 >= 0 ? (long)value0 >> (int)value1 : (long)value0 << (int)(-value1);
+                            valueResult = value1 >= 0 ? (long)value0 >> (int)value1 : (long)value0 << (int)(-value1);
+                            break;
 
 
                     }
@@ -291,6 +329,7 @@ namespace OneLineCalculator
                 {
                     throw new Exception("ERROR unknown op1@ : " + textLevel + " opStart:" + opStart1 + " opEnd:" + opEnd1);
                 }
+                return new List<double> { valueResult };
             }
             else
             {
@@ -325,26 +364,25 @@ namespace OneLineCalculator
             }
 
 
-            bool isWrongFmtDetect;
-            do
-            {
-                isWrongFmtDetect = false;
-                while (isWrongFmtDetect |= text.Contains("--"))
-                    text = text.Replace("--", "+");
-                while (isWrongFmtDetect |= text.Contains("-+"))
-                    text = text.Replace("-+", "-");
-                while (isWrongFmtDetect |= text.Contains("+-"))
-                    text = text.Replace("+-", "-");
-                while (isWrongFmtDetect |= text.Contains("--"))
-                    text = text.Replace("--", "+");
-                while (isWrongFmtDetect |= text.Contains("++"))
-                    text = text.Replace("++", "+");
-                while (isWrongFmtDetect |= text.Contains("+-"))
-                    text = text.Replace("+-", "-");
-            } while (isWrongFmtDetect);
-
-
             MatchCollection matches;
+
+            //bool isWrongFmtDetect;
+            //string[,] fmtReplacePair = { { "--", "+" },{ "-+", "-" },{ "+-", "-" },{ "--", "+" },{ "++", "+" },{ "+-", "-" } };
+            //do
+            //{
+            //    isWrongFmtDetect = false;
+            //    for (int i = 0; i < fmtReplacePair.GetLength(0); i++)
+            //    {
+            //        if (text.Contains(fmtReplacePair[i,0]))
+            //        {
+            //            isWrongFmtDetect = true;
+            //            text = text.Replace(fmtReplacePair[i, 0], fmtReplacePair[i, 1]);
+            //        }
+            //    }
+            //} while (isWrongFmtDetect);
+
+
+            
             int rootIdx = 0;
             List<double> listValue = new List<double>();
             List<string> listLevel = new List<string>();
@@ -358,7 +396,23 @@ namespace OneLineCalculator
             //matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|(-|\\+)?[\\d.]+");//\(([^\(\)]*)\)
             //matchList.AddRange(matches.Cast<Match>().ToList());
 
-            matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|(-|\\+)?[\\d.]+|exp|e");//\(([^\(\)]*)\)
+            //matches = Regex.Matches(text, "[\\d.]");//\(([^\(\)]*)\)
+            //for (int i= matches.Count-1;i>=0;i--)
+            //{
+            //    char peekPre = (char)0, peekPrePre = (char)0, peekPost = (char)0;
+            //    if (matches[i].Index > 0) peekPre = text[matches[i].Index - 1];
+            //    if (matches[i].Index > 1) peekPrePre = text[matches[i].Index - 2];
+            //    if (matches[i].Index + 1 < text.Length) peekPost = text[matches[i].Index + 1];
+            //    if (peekPre == '-' && (peekPrePre != ))
+            //    {
+            //        text = text.Insert(matches[i].Index-1, "+");
+            //        continue;
+            //    }
+            //    if (matches[i].Value == "0" && (peekPost == 'x' || peekPost == 'b')) continue;
+            //    text = text.Insert(matches[i].Index, "+");
+            //}
+
+            matches = Regex.Matches(text, "(0x)[\\da-fA-F]+|(0b)[01]+|[01]+b|pi|conste|[\\d.]+|exp|e");//\(([^\(\)]*)\)
             var matchList = matches.Cast<Match>().Where(x => !x.Value.ToLower().Equals("exp")).ToList<Match>();
 
             string textNoNum = ReplaceWithIndex(text, matchList, true, listValue.Count, "[", "]");
@@ -401,61 +455,65 @@ namespace OneLineCalculator
 
             //Step3. Detect the supported operators
             string patternItem = "[\\[\\{]\\d+[\\]\\}]";//\\[\\d+\\]
-            string patternOneSideOp = "log|exp" + "|[a]?cos[h]?|[a]?tan[h]?|[a]?sin[h]?" + "|sqrt|int";
-            for (int l = 0; l < listLevel.Count; l++)
+            string[] patternOneSideOpList = new string[] { "log|exp" + "|[a]?cos[h]?|[a]?tan[h]?|[a]?sin[h]?" + "|sqrt|int", "-"};
+            for (int o = 0; o < patternOneSideOpList.Length; o++)
             {
-
-                //matches = Regex.Matches(listLevel[l], patternItem);
-                //if (matches.Count < 2)
-                //    continue;
-                matches = Regex.Matches(listLevel[l], patternOneSideOp);
-                if (matches.Count <= 1)
-                    continue;
-
-                matches = Regex.Matches(listLevel[l], "("+patternOneSideOp+")" + patternItem);
-                if (matches.Count == 0)
-                    break;
-                
-                string textTmp = ReplaceWithIndex(listLevel[l], matches, true, listLevel.Count, "{", "}");
-                listLevel[l] = textTmp;
-                foreach (Match m in matches)
-                {
-                    listLevel.Add(m.Value);
-                }
-                l--;
-            }
-            
-            string [] patternBaseList = new string[] { "(\\*|\\/|pow|%|>>|<<|\\^|\\||\\&)+" + patternItem, "[\\+\\-]+"+ patternItem };
-            for (int p=0;p< patternBaseList.Length;p++)
-            {
-                string patternBase = patternBaseList[p];
+                string patternOneSideOp = patternOneSideOpList[o];
                 for (int l = 0; l < listLevel.Count; l++)
                 {
-                    matches = Regex.Matches(listLevel[l], patternItem);
-                    if (matches.Count <= 2)
+
+                    //matches = Regex.Matches(listLevel[l], patternItem);
+                    //if (matches.Count < 2)
+                    //    continue;
+                    matches = Regex.Matches(listLevel[l], patternOneSideOp);
+                    if (matches.Count == 0)
                         continue;
 
-                    matches = Regex.Matches(listLevel[l], patternItem + "(" + patternBase + ")+");
+                    matches = Regex.Matches(listLevel[l], "(" + patternOneSideOp + ")" + patternItem);
+                    if (matches.Count == 0 || (matches.Count == 1 && matches[0].Index == 0))
+                        continue;
 
-                    if (matches.Count == 1 && matches[0].Value.Equals(listLevel[l]))
+                    string textTmp = ReplaceWithIndex(listLevel[l], matches, true, listLevel.Count, "{", "}");
+                    listLevel[l] = textTmp;
+                    foreach (Match m in matches)
                     {
-                        matches = Regex.Matches(listLevel[l], patternBase);
-                        PrintMatches(matches, listLevel[l]);
-                        if (matches.Count > 1)
-                        {
-                            string valEnd = matches[matches.Count - 1].Value;
-                            listLevel.Add(listLevel[l].Replace(valEnd, ""));
-                            listLevel[l] = "{" + (listLevel.Count - 1) + "}" + valEnd;
-                            Console.WriteLine(p + "-" + l + " " + listLevel[l]);
-                        }
+                        listLevel.Add(m.Value);
                     }
-                    else
+                    l--;
+                }
+
+                string[] patternBaseList = new string[] { "(\\*|\\/|pow|%|>>|<<|\\^|\\||\\&)+(\\+|-)?" + patternItem, "[\\+\\-]+" + patternItem };
+                for (int p = 0; p < patternBaseList.Length; p++)
+                {
+                    string patternBase = patternBaseList[p];
+                    for (int l = 0; l < listLevel.Count; l++)
                     {
-                        string textTmp = ReplaceWithIndex(listLevel[l], matches, true, listLevel.Count, "{", "}");
-                        listLevel[l] = textTmp;
-                        foreach (Match m in matches)
+                        matches = Regex.Matches(listLevel[l], patternItem);
+                        if (matches.Count <= 2)
+                            continue;
+
+                        matches = Regex.Matches(listLevel[l], patternItem + "(" + patternBase + ")+");
+
+                        if (matches.Count == 1 && matches[0].Value.Equals(listLevel[l]))
                         {
-                            listLevel.Add(m.Value);
+                            matches = Regex.Matches(listLevel[l], patternBase);
+                            PrintMatches(matches, listLevel[l]);
+                            if (matches.Count > 1)
+                            {
+                                string valEnd = matches[matches.Count - 1].Value;
+                                listLevel.Add(listLevel[l].Replace(valEnd, ""));
+                                listLevel[l] = "{" + (listLevel.Count - 1) + "}" + valEnd;
+                                Console.WriteLine(p + "-" + l + " " + listLevel[l]);
+                            }
+                        }
+                        else
+                        {
+                            string textTmp = ReplaceWithIndex(listLevel[l], matches, true, listLevel.Count, "{", "}");
+                            listLevel[l] = textTmp;
+                            foreach (Match m in matches)
+                            {
+                                listLevel.Add(m.Value);
+                            }
                         }
                     }
                 }
@@ -463,7 +521,7 @@ namespace OneLineCalculator
 
 
             double result = double.NaN;
-            result = GetValue(listLevel[rootIdx], patternItem, listValue, listLevel,ref warningFlags);
+            result = GetValue(listLevel[rootIdx], patternItem, listValue, listLevel,ref warningFlags)[0];
 
 
             Console.WriteLine("Value:");

@@ -1,4 +1,6 @@
-﻿using System;
+﻿#define ENABLE_DynamicExpresso
+
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -15,6 +17,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+
+
 
 namespace OneLineCalculator
 {
@@ -100,9 +104,9 @@ namespace OneLineCalculator
 
     public partial class MainWindow : Window
     {
-
+#if !ENABLE_DynamicExpresso
         private DynamicExpresso.Interpreter mInterpreter = new DynamicExpresso.Interpreter();
-
+#endif
         public List<CalcItem> mCalcList { get; set; }
         public CalcItem mCalcCur { get; set; }
         //public CalcItem mCalcCur = new CalcItem("test",0.123);
@@ -279,7 +283,8 @@ namespace OneLineCalculator
             double res;
             //res = RegexFormulas.Eval("(99)+(-23-((3+101b)/(0xF0)+-0x123+(0+1+2-3/4*5%6pow7pow8--++----9)))");
 
-            //res = RegexFormulas.Eval("-1+1<<4");
+            res = RegexFormulas.Eval("1-2pow-2");
+            res = RegexFormulas.Eval("1+log2-3pow2");
             //res = RegexFormulas.Eval("-(1+2)");
             //res = RegexFormulas.Eval("100^165");
             //res = RegexFormulas.Eval("int(1111pow11111)");
@@ -997,6 +1002,7 @@ namespace OneLineCalculator
                     }
                 }
 
+#if !ENABLE_DynamicExpresso
                 if (mDebugMode == 0 || mDebugMode == 1)
                 {
                     try
@@ -1017,6 +1023,9 @@ namespace OneLineCalculator
                         result3rd = double.NaN;
                     }
                 }
+#else
+                result3rd = resultNative;
+#endif
 
                 if (double.IsNaN(resultNative) && double.IsNaN(result3rd))
                 {
