@@ -226,6 +226,12 @@ namespace OneLineCalculator
                             case "atan":
                                 value0Tmp = Math.Atan(value0);
                                 break;
+                            case "rnd":
+                                {
+                                    var rand = new Random();
+                                    value0Tmp = value0 * rand.NextDouble();
+                                }
+                                break;
 
                             case "int":
                                 if (!(value0 >= -9223372036854775808.0   // -2^63

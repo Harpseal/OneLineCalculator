@@ -957,50 +957,71 @@ namespace OneLineCalculator
             }
             else
             {
-                //MenuItemDebug.Header = "[Debug] " + (mDebugMode == 0?"Both":mDebugMode == 1? "3rd":"Native");
-                double resultNative = double.NaN;
-                double result3rd = double.NaN;
-
-                mTextEqualitySign.Text = "=";
-                bool isErrorDetected = false;
-                if (mDebugMode == 0 || mDebugMode >= 2)
+                CalText(cb.Text);
+                if (e != null && e.Key == Key.Enter)
                 {
-                    try
-                    {
-                        RegexFormulas.EvalWarningFlags flags = RegexFormulas.EvalWarningFlags.None;
-                        resultNative = RegexFormulas.Eval(cb.Text, ref flags);
-                        if ((flags & RegexFormulas.EvalWarningFlags.DoubleToInt) != 0)
-                        {
-                            Console.WriteLine(RegexFormulas.EvalWarningFlags.DoubleToInt);
-                            mTextEqualitySign.Text = "≈";
-                        }
-
-                    }
-                    catch (ArgumentOutOfRangeException ea)
-                    {
-                        isErrorDetected = true;
-                        mTextResult.Text = "OutOfRange:"+ea.Message;
-                        resultNative = double.NaN;
-                    }
-                    catch (OverflowException eof)
-                    {
-                        isErrorDetected = true;
-                        mTextResult.Text = "Overflow:" + eof.Message;
-                        resultNative = double.NaN;
-                    }
-                    catch (DivideByZeroException ediv)
-                    {
-                        isErrorDetected = true;
-                        mTextResult.Text = "DivideByZero";
-                        resultNative = double.NaN;
-                    }
-                    catch (Exception ex)
-                    {
-                        //Console.WriteLine(ex.Message);
-                        resultNative = double.NaN;
-
-                    }
+                    cb.Text = "";
+                    mTextResult.Text = "Saved";
+                    mTextResult.Opacity = 0.5;
+                    mCalcList.Add(mCalcCur);
+                    mComboBoxCalc.ItemsSource = null;
+                    mComboBoxCalc.ItemsSource = mCalcList;
+                    mCalcCur = null;
                 }
+                
+            }
+
+            size = MeasureString(mTextResult.Text);
+            mTextResult.Width = size.Width;
+            e.Handled = true;
+        }
+
+        private void CalText(string text)
+        {
+            //MenuItemDebug.Header = "[Debug] " + (mDebugMode == 0?"Both":mDebugMode == 1? "3rd":"Native");
+            double resultNative = double.NaN;
+            double result3rd = double.NaN;
+
+            mTextEqualitySign.Text = "=";
+            bool isErrorDetected = false;
+            if (mDebugMode == 0 || mDebugMode >= 2)
+            {
+                try
+                {
+                    RegexFormulas.EvalWarningFlags flags = RegexFormulas.EvalWarningFlags.None;
+                    resultNative = RegexFormulas.Eval(text, ref flags);
+                    if ((flags & RegexFormulas.EvalWarningFlags.DoubleToInt) != 0)
+                    {
+                        Console.WriteLine(RegexFormulas.EvalWarningFlags.DoubleToInt);
+                        mTextEqualitySign.Text = "≈";
+                    }
+
+                }
+                catch (ArgumentOutOfRangeException ea)
+                {
+                    isErrorDetected = true;
+                    mTextResult.Text = "OutOfRange:" + ea.Message;
+                    resultNative = double.NaN;
+                }
+                catch (OverflowException eof)
+                {
+                    isErrorDetected = true;
+                    mTextResult.Text = "Overflow:" + eof.Message;
+                    resultNative = double.NaN;
+                }
+                catch (DivideByZeroException ediv)
+                {
+                    isErrorDetected = true;
+                    mTextResult.Text = "DivideByZero";
+                    resultNative = double.NaN;
+                }
+                catch (Exception ex)
+                {
+                    //Console.WriteLine(ex.Message);
+                    resultNative = double.NaN;
+
+                }
+            }
 
 #if !ENABLE_DynamicExpresso
                 if (mDebugMode == 0 || mDebugMode == 1)
@@ -1024,67 +1045,52 @@ namespace OneLineCalculator
                     }
                 }
 #else
-                result3rd = resultNative;
+            result3rd = resultNative;
 #endif
 
-                if (double.IsNaN(resultNative) && double.IsNaN(result3rd))
+            if (double.IsNaN(resultNative) && double.IsNaN(result3rd))
+            {
+                if (!isErrorDetected)
+                    mTextResult.Text = "----"; ;
+                mTextResult.Opacity = 0.5;
+                if (mCalcCur != null)
                 {
-                    if (!isErrorDetected)
-                        mTextResult.Text = "----"; ;
-                    mTextResult.Opacity = 0.5;
-                    if (mCalcCur != null)
-                    {
-                        mCalcCur.mCalcResult = Double.NaN;
-                        mCalcCur.mCalcTextResult = "";
-                    }
-                }
-                else
-                {
-
-                    if (mCalcCur == null)
-                        mCalcCur = new CalcItem();
-                    mCalcCur.mCalcText = cb.Text;
-
-                    if (!double.IsNaN(resultNative))
-                        mCalcCur.mCalcResult = resultNative;
-                    else if (!double.IsNaN(result3rd))
-                        mCalcCur.mCalcResult = result3rd;
-
-                    mCalcCur.mCalcTextResult = mCalcCur.mCalcResult.ToString();
-
-                    if (mDebugMode == 0)
-                        Console.WriteLine("Native:" + resultNative + " 3rd:" + result3rd);
-
-                    if (e.Key == Key.Enter)
-                    {
-                        cb.Text = "";
-                        mTextResult.Text = "Saved";
-                        mTextResult.Opacity = 0.5;
-                        mCalcList.Add(mCalcCur);
-                        mComboBoxCalc.ItemsSource = null;
-                        mComboBoxCalc.ItemsSource = mCalcList;
-                        mCalcCur = null;
-                    }
-                    else
-                    {
-                        UpdateResult();
-                        if (mDebugMode == 0)
-                        {
-
-                            if ((!double.IsNaN(resultNative) && !double.IsNaN(result3rd) && Math.Abs(resultNative - result3rd) > 2) ||
-                                (double.IsNaN(resultNative) && !double.IsNaN(result3rd)))
-                                mTextResult.Text = "N:" + resultNative + " 3:" + result3rd;
-                        }
-                        
-                            
-                        mTextResult.Opacity = 1;
-                    }
+                    mCalcCur.mCalcResult = Double.NaN;
+                    mCalcCur.mCalcTextResult = "";
                 }
             }
+            else
+            {
 
-            size = MeasureString(mTextResult.Text);
-            mTextResult.Width = size.Width;
-            e.Handled = true;
+                if (mCalcCur == null)
+                    mCalcCur = new CalcItem();
+                mCalcCur.mCalcText = text;
+
+                if (!double.IsNaN(resultNative))
+                    mCalcCur.mCalcResult = resultNative;
+                else if (!double.IsNaN(result3rd))
+                    mCalcCur.mCalcResult = result3rd;
+
+                mCalcCur.mCalcTextResult = mCalcCur.mCalcResult.ToString();
+
+                if (mDebugMode == 0)
+                    Console.WriteLine("Native:" + resultNative + " 3rd:" + result3rd);
+
+
+                {
+                    UpdateResult();
+                    if (mDebugMode == 0)
+                    {
+
+                        if ((!double.IsNaN(resultNative) && !double.IsNaN(result3rd) && Math.Abs(resultNative - result3rd) > 2) ||
+                            (double.IsNaN(resultNative) && !double.IsNaN(result3rd)))
+                            mTextResult.Text = "N:" + resultNative + " 3:" + result3rd;
+                    }
+
+
+                    mTextResult.Opacity = 1;
+                }
+            }
         }
 
         private void ComboBoxCalc_DropDownOpened(object sender, EventArgs e)
@@ -1098,7 +1104,19 @@ namespace OneLineCalculator
 
         private void BtnResult_Click(object sender, RoutedEventArgs e)
         {
-            Clipboard.SetText(mTextResult.Text);
+            try
+            {
+                //Clipboard.SetText(mTextResult.Text);
+                Clipboard.SetDataObject(mTextResult.Text);
+            } catch (System.Runtime.InteropServices.COMException ecom)
+            {
+                Console.WriteLine(ecom.ToString());
+            }
+            
+            if (mComboBoxCalc.Text.Contains("rnd"))
+            {
+                CalText(mComboBoxCalc.Text);
+            }
         }
 
         private void MenuItem_Click(object sender, RoutedEventArgs e)
