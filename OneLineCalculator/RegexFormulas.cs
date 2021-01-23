@@ -489,16 +489,18 @@ namespace OneLineCalculator
                 }
 
                 string[] patternBaseList = new string[] { "(\\*|\\/|pow|%|>>|<<|\\^|\\||\\&)+(\\+|-)?" + patternItem, "[\\+\\-]+" + patternItem };
+                string[] patternBaseListPre = new string[] { "", "[\\+\\-]?" };
                 for (int p = 0; p < patternBaseList.Length; p++)
                 {
                     string patternBase = patternBaseList[p];
+                    string patternPre = patternBaseListPre[p];
                     for (int l = 0; l < listLevel.Count; l++)
                     {
                         matches = Regex.Matches(listLevel[l], patternItem);
                         if (matches.Count <= 2)
                             continue;
 
-                        matches = Regex.Matches(listLevel[l], patternItem + "(" + patternBase + ")+");
+                        matches = Regex.Matches(listLevel[l], patternPre + patternItem + "(" + patternBase + ")+");
 
                         if (matches.Count == 1 && matches[0].Value.Equals(listLevel[l]))
                         {
